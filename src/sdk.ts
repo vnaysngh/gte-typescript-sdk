@@ -21,6 +21,7 @@ import {
   QuoteRequest,
   QuoteResult,
   RestClientOptions,
+  UserPortfolio,
   SwapExactInParams,
 } from "./types";
 import {
@@ -83,6 +84,10 @@ export class GteSdk {
     };
     const response = await this.rest.get<MarketSummary[]>("/markets", query);
     return response;
+  }
+
+  getUserPortfolio(userAddress: Address): Promise<UserPortfolio> {
+    return this.rest.get<UserPortfolio>(`/users/${userAddress}/portfolio`);
   }
 
   async getQuote(request: QuoteRequest): Promise<QuoteResult> {

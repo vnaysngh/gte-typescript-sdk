@@ -85,6 +85,19 @@ export interface QuoteResult {
   path: Address[];
 }
 
+export interface TokenBalance {
+  token: TokenSummary;
+  balance: string;
+  balanceUsd: string;
+  realizedPnlUsd: string;
+  unrealizedPnlUsd: string;
+}
+
+export interface UserPortfolio {
+  tokens: TokenBalance[];
+  totalUsdBalance: string;
+}
+
 export interface BuildApproveParams {
   tokenAddress: Address;
   spender?: Address;

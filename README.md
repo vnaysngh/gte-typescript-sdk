@@ -5,6 +5,7 @@ A lightweight React-friendly TypeScript SDK that mirrors the [`gte-python-sdk`](
 ## Features
 - ✅ Network config helper (`getChainConfig`) derived from the Python SDK/testnet docs.
 - ✅ Typed REST client for `/markets` (pairs, TVL, prices, volumes).
+- ✅ Portfolio endpoint (`/users/{address}/portfolio`) to render wallet balances in USD.
 - ✅ On-chain quoting via the MegaETH Uniswap v2 router (`getQuote`).
 - ✅ Transaction builders for ERC-20 approvals and `swapExactIn` flows (`buildApprove`, `buildSwapExactIn`).
 - ✅ Works in React (fetch + viem under the hood) with examples in `examples/`.
@@ -42,6 +43,9 @@ const { tx: swapTx } = await sdk.buildSwapExactIn({
   quote,
   recipient: "0xYourWallet",
 });
+
+const portfolio = await sdk.getUserPortfolio("0xYourWallet");
+console.log(portfolio.totalUsdBalance);
 ```
 Each builder returns the `to`, `data`, and `value` payload ready to hand to wagmi/ethers/viem for signing.
 
@@ -63,6 +67,7 @@ node --loader ts-node/esm examples/basic.ts
 | --- | --- |
 | `getChainConfig()` | Returns the MegaETH testnet config + router/WETH addresses. |
 | `getMarkets(params)` | Calls `/markets` using the official OpenAPI spec. |
+| `getUserPortfolio(address)` | Returns balances + USD valuations for a wallet from `/users/{address}/portfolio`. |
 | `getQuote({ tokenIn, tokenOut, amountIn, slippageBps })` | Reads `getAmountsOut` from the Uniswap v2 router to provide amount + price. |
 | `buildApprove({ tokenAddress, spender?, amount? })` | Encodes an ERC-20 approval; defaults to max approval for the MegaETH AMM router. |
 | `buildSwapExactIn({ tokenIn, tokenOut, amountIn, recipient, quote?, deadlineSeconds?, useNativeIn?, useNativeOut? })` | Builds the [`swapExact*`](https://docs.gte.xyz/sdk-reference/python-sdk) transaction matching the Python reference implementation. |

@@ -3,7 +3,7 @@ import { decodeFunctionData, parseUnits, type Address, type PublicClient } from 
 
 import { GteSdk } from "../src";
 import { ERC20_ABI, UNISWAP_V2_ROUTER_ABI } from "../src/constants";
-import type { MarketSummary, QuoteResult, TokenSummary } from "../src/types";
+import type { MarketSummary, QuoteResult, TokenSummary, UserPortfolio } from "../src/types";
 
 const MOCK_ROUTER = "0x86470efcEa37e50F94E74649463b737C87ada367" as Address;
 const BASE_TOKEN: TokenSummary = {
@@ -31,6 +31,19 @@ const MOCK_MARKET: MarketSummary = {
   marketCapUsd: "1000",
   createdAt: Date.now(),
   tvlUsd: "500",
+};
+
+const MOCK_PORTFOLIO: UserPortfolio = {
+  tokens: [
+    {
+      token: BASE_TOKEN,
+      balance: "1",
+      balanceUsd: "2000",
+      realizedPnlUsd: "0",
+      unrealizedPnlUsd: "0",
+    },
+  ],
+  totalUsdBalance: "2000",
 };
 
 const noopFetch = createMockFetch({});
@@ -140,6 +153,25 @@ describe("GteSdk", () => {
     const decodedPath = (decoded.args?.[2] as string[]).map((addr) => addr.toLowerCase());
     const quotePath = quote.path.map((addr) => addr.toLowerCase());
     expect(decodedPath).toEqual(quotePath);
+  });
+
+  it("fetches user portfolio data", async () => {
+    const user = "0x0000000000000000000000000000000000000abc" as Address;
+    const sdk = new GteSdk({
+      restOptions: {
+        baseUrl: "https://mock.gte",
+        fetchImpl: createMockFetch({
+          "/markets": [MOCK_MARKET],
+          [`/users/${user}/portfolio`]: MOCK_PORTFOLIO,
+        }),
+      },
+      publicClient: noopPublicClient,
+      uniswapRouterAddress: MOCK_ROUTER,
+    });
+
+    const portfolio = await sdk.getUserPortfolio(user);
+    expect(portfolio.totalUsdBalance).toBe("2000");
+    expect(portfolio.tokens[0].token.address).toBe(BASE_TOKEN.address);
   });
 });
 
