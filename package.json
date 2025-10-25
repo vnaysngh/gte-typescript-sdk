@@ -1,0 +1,33 @@
+{
+  "name": "gte-typescript-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript/React SDK for GTE MegaETH AMM swaps",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "gte",
+    "megaeth",
+    "sdk",
+    "amm",
+    "defi"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "viem": "^2.7.10"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "tsup": "^8.0.1",
+    "typescript": "^5.4.5",
+    "vitest": "^4.0.3"
+  }
+}
