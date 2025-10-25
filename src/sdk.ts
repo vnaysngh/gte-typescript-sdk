@@ -14,15 +14,26 @@ import { RestClient } from "./http";
 import {
   BuildApproveParams,
   BuildSwapExactInResult,
+  BuildSwapExactOutResult,
   ChainConfig,
+  GetCandlesParams,
   GetMarketsParams,
+  GetTokensParams,
+  GetTradesParams,
+  MarketCandle,
+  MarketOrderBookSnapshot,
   MarketSummary,
+  MarketTrade,
   PreparedTransaction,
   QuoteRequest,
   QuoteResult,
+  QuoteExactOutRequest,
+  QuoteExactOutResult,
   RestClientOptions,
+  TokenSummary,
   UserPortfolio,
   SwapExactInParams,
+  SwapExactOutParams,
 } from "./types";
 import {
   DEFAULT_SLIPPAGE_BPS,
@@ -90,6 +101,53 @@ export class GteSdk {
     return this.rest.get<UserPortfolio>(`/users/${userAddress}/portfolio`);
   }
 
+  async getTokens(params: GetTokensParams = {}): Promise<TokenSummary[]> {
+    const query = {
+      limit: params.limit,
+      offset: params.offset,
+      marketType: params.marketType,
+      creator: params.creator,
+      metadata: params.metadata,
+    };
+    return this.rest.get<TokenSummary[]>("/tokens", query);
+  }
+
+  getToken(tokenAddress: Address): Promise<TokenSummary> {
+    return this.rest.get<TokenSummary>(`/tokens/${tokenAddress}`);
+  }
+
+  getMarket(marketAddress: Address): Promise<MarketSummary> {
+    return this.rest.get<MarketSummary>(`/markets/${marketAddress}`);
+  }
+
+  getMarketTrades(
+    marketAddress: Address,
+    params: GetTradesParams = {},
+  ): Promise<MarketTrade[]> {
+    const query = { limit: params.limit, offset: params.offset };
+    return this.rest.get<MarketTrade[]>(`/markets/${marketAddress}/trades`, query);
+  }
+
+  getMarketOrderBook(
+    marketAddress: Address,
+    limit = 20,
+  ): Promise<MarketOrderBookSnapshot> {
+    return this.rest.get<MarketOrderBookSnapshot>(`/markets/${marketAddress}/book`, { limit });
+  }
+
+  getMarketCandles(
+    marketAddress: Address,
+    params: GetCandlesParams,
+  ): Promise<MarketCandle[]> {
+    const query = {
+      interval: params.interval,
+      startTime: params.startTime,
+      endTime: params.endTime,
+      limit: params.limit,
+    };
+    return this.rest.get<MarketCandle[]>(`/markets/${marketAddress}/candles`, query);
+  }
+
   async getQuote(request: QuoteRequest): Promise<QuoteResult> {
     const slippageBps = request.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
     const ctx: QuoteContext = { ...request, slippageBps };
@@ -99,12 +157,12 @@ export class GteSdk {
     }
     const amountInAtomic = this.toAtomic(ctx.amountIn, ctx.tokenIn.decimals);
     const router = await this.getUniswapRouterAddress();
-    const amountsOut = await this.publicClient.readContract({
+    const amountsOut = (await this.publicClient.readContract({
       address: router,
       abi: UNISWAP_V2_ROUTER_ABI,
       functionName: "getAmountsOut",
       args: [amountInAtomic, path],
-    });
+    })) as readonly bigint[];
     const expectedAmountOutAtomic = amountsOut[amountsOut.length - 1];
     const expectedAmountOut = formatUnits(expectedAmountOutAtomic, ctx.tokenOut.decimals);
     const minAmountOutAtomic =
@@ -121,6 +179,42 @@ export class GteSdk {
       expectedAmountOutAtomic,
       minAmountOut,
       minAmountOutAtomic,
+      price: Number.isFinite(price) ? price.toString() : "0",
+      slippageBps,
+      path,
+    };
+  }
+
+  async getQuoteExactOut(request: QuoteExactOutRequest): Promise<QuoteExactOutResult> {
+    const slippageBps = request.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
+    const path = request.path ?? [request.tokenIn.address, request.tokenOut.address];
+    if (path.length < 2) {
+      throw new Error("Quote path must include at least tokenIn and tokenOut");
+    }
+    const amountOutAtomic = this.toAtomic(request.amountOut, request.tokenOut.decimals);
+    const router = await this.getUniswapRouterAddress();
+    const amountsIn = (await this.publicClient.readContract({
+      address: router,
+      abi: UNISWAP_V2_ROUTER_ABI,
+      functionName: "getAmountsIn",
+      args: [amountOutAtomic, path],
+    })) as readonly bigint[];
+    const expectedAmountInAtomic = amountsIn[0];
+    const expectedAmountIn = formatUnits(expectedAmountInAtomic, request.tokenIn.decimals);
+    const maxAmountInAtomic =
+      (expectedAmountInAtomic * BigInt(10_000 + slippageBps)) / 10_000n;
+    const maxAmountIn = formatUnits(maxAmountInAtomic, request.tokenIn.decimals);
+    const outputFloat = parseFloat(this.toDecimalString(request.amountOut));
+    const expectedInFloat = parseFloat(expectedAmountIn);
+    const price = outputFloat > 0 && expectedInFloat > 0 ? outputFloat / expectedInFloat : 0;
+
+    return {
+      amountOut: this.toDecimalString(request.amountOut),
+      amountOutAtomic,
+      expectedAmountIn,
+      expectedAmountInAtomic,
+      maxAmountIn,
+      maxAmountInAtomic,
       price: Number.isFinite(price) ? price.toString() : "0",
       slippageBps,
       path,
@@ -159,6 +253,34 @@ export class GteSdk {
     });
 
     const value = params.useNativeIn ? quote.amountInAtomic : 0n;
+
+    return {
+      tx: {
+        to: router,
+        data,
+        value,
+        chainId: this.chain.id,
+      },
+      quote,
+      deadline,
+    };
+  }
+
+  async buildSwapExactOut(params: SwapExactOutParams): Promise<BuildSwapExactOutResult> {
+    const quote = params.quote ?? (await this.getQuoteExactOut(params));
+    const router = await this.getUniswapRouterAddress();
+    const deadlineSeconds = params.deadlineSeconds ?? 20 * 60;
+    const deadline = Math.floor(Date.now() / 1000) + deadlineSeconds;
+    const data = this.encodeSwapExactOutCalldata({
+      quote,
+      recipient: params.recipient,
+      deadline,
+      useNativeIn: params.useNativeIn ?? false,
+      useNativeOut: params.useNativeOut ?? false,
+      wethAddress: this.chain.wethAddress,
+    });
+
+    const value = params.useNativeIn ? quote.maxAmountInAtomic : 0n;
 
     return {
       tx: {
@@ -259,6 +381,59 @@ export class GteSdk {
       args: [
         args.quote.amountInAtomic,
         args.quote.minAmountOutAtomic,
+        args.quote.path,
+        args.recipient,
+        deadlineBigInt,
+      ],
+    });
+  }
+
+  private encodeSwapExactOutCalldata(args: {
+    quote: QuoteExactOutResult;
+    recipient: Address;
+    deadline: number;
+    useNativeIn: boolean;
+    useNativeOut: boolean;
+    wethAddress: Address;
+  }): Hex {
+    const deadlineBigInt = BigInt(args.deadline);
+    if (args.useNativeIn && args.useNativeOut) {
+      throw new Error("Cannot use native token for both input and output");
+    }
+    if (args.useNativeIn && args.quote.path[0]?.toLowerCase() !== args.wethAddress.toLowerCase()) {
+      throw new Error("Native input swaps must start the path with the wrapped native token");
+    }
+    const lastHop = args.quote.path[args.quote.path.length - 1];
+    if (args.useNativeOut && lastHop?.toLowerCase() !== args.wethAddress.toLowerCase()) {
+      throw new Error("Native output swaps must end the path with the wrapped native token");
+    }
+
+    if (args.useNativeIn) {
+      return encodeFunctionData({
+        abi: UNISWAP_V2_ROUTER_ABI,
+        functionName: "swapETHForExactTokens",
+        args: [args.quote.amountOutAtomic, args.quote.path, args.recipient, deadlineBigInt],
+      });
+    }
+    if (args.useNativeOut) {
+      return encodeFunctionData({
+        abi: UNISWAP_V2_ROUTER_ABI,
+        functionName: "swapTokensForExactETH",
+        args: [
+          args.quote.amountOutAtomic,
+          args.quote.maxAmountInAtomic,
+          args.quote.path,
+          args.recipient,
+          deadlineBigInt,
+        ],
+      });
+    }
+    return encodeFunctionData({
+      abi: UNISWAP_V2_ROUTER_ABI,
+      functionName: "swapTokensForExactTokens",
+      args: [
+        args.quote.amountOutAtomic,
+        args.quote.maxAmountInAtomic,
         args.quote.path,
         args.recipient,
         deadlineBigInt,

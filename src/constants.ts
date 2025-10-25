@@ -111,6 +111,44 @@ export const UNISWAP_V2_ROUTER_ABI = [
     ],
     outputs: [{ name: "amounts", type: "uint256[]" }],
   },
+  {
+    type: "function",
+    name: "swapTokensForExactTokens",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "amountOut", type: "uint256" },
+      { name: "amountInMax", type: "uint256" },
+      { name: "path", type: "address[]" },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+  },
+  {
+    type: "function",
+    name: "swapTokensForExactETH",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "amountOut", type: "uint256" },
+      { name: "amountInMax", type: "uint256" },
+      { name: "path", type: "address[]" },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+  },
+  {
+    type: "function",
+    name: "swapETHForExactTokens",
+    stateMutability: "payable",
+    inputs: [
+      { name: "amountOut", type: "uint256" },
+      { name: "path", type: "address[]" },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [{ name: "amounts", type: "uint256[]" }],
+  },
 ];
 
 export const GTE_ROUTER_MIN_ABI = [

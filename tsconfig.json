@@ -15,5 +15,5 @@
     "lib": ["ES2020", "DOM"],
     "sourceMap": true
   },
-  "include": ["src/**/*", "examples/**/*", "tests/**/*"]
+  "include": ["src/**/*", "examples/**/*.ts", "tests/**/*"]
 }

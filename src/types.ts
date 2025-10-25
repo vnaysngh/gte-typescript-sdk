@@ -12,6 +12,14 @@ export interface TokenSummary {
   totalSupply?: string | null;
 }
 
+export interface GetTokensParams {
+  limit?: number;
+  offset?: number;
+  marketType?: MarketType;
+  creator?: Address;
+  metadata?: boolean;
+}
+
 export interface MarketSummary {
   marketType: MarketType;
   address: Address;
@@ -98,6 +106,66 @@ export interface UserPortfolio {
   totalUsdBalance: string;
 }
 
+export interface QuoteExactOutRequest {
+  tokenIn: TokenSummary;
+  tokenOut: TokenSummary;
+  amountOut: string | number | bigint;
+  slippageBps?: number;
+  path?: Address[];
+}
+
+export interface QuoteExactOutResult {
+  amountOut: string;
+  amountOutAtomic: bigint;
+  expectedAmountIn: string;
+  expectedAmountInAtomic: bigint;
+  maxAmountIn: string;
+  maxAmountInAtomic: bigint;
+  price: string;
+  slippageBps: number;
+  path: Address[];
+}
+
+export interface MarketTrade {
+  price: string;
+  size: string;
+  side: "buy" | "sell";
+  timestamp: number;
+  txHash?: string;
+}
+
+export interface MarketOrderBookLevel {
+  price: string;
+  size: string;
+}
+
+export interface MarketOrderBookSnapshot {
+  bids: MarketOrderBookLevel[];
+  asks: MarketOrderBookLevel[];
+}
+
+export interface MarketCandle {
+  timestamp: number;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+  numTrades?: number;
+}
+
+export interface GetTradesParams {
+  limit?: number;
+  offset?: number;
+}
+
+export interface GetCandlesParams {
+  interval: string;
+  startTime: number;
+  endTime?: number;
+  limit?: number;
+}
+
 export interface BuildApproveParams {
   tokenAddress: Address;
   spender?: Address;
@@ -113,6 +181,14 @@ export interface SwapExactInParams extends QuoteRequest {
   useNativeOut?: boolean;
 }
 
+export interface SwapExactOutParams extends QuoteExactOutRequest {
+  recipient: Address;
+  deadlineSeconds?: number;
+  quote?: QuoteExactOutResult;
+  useNativeIn?: boolean;
+  useNativeOut?: boolean;
+}
+
 export interface PreparedTransaction {
   to: Address;
   data: Hex;
@@ -124,5 +200,11 @@ export interface PreparedTransaction {
 export interface BuildSwapExactInResult {
   tx: PreparedTransaction;
   quote: QuoteResult;
+  deadline: number;
+}
+
+export interface BuildSwapExactOutResult {
+  tx: PreparedTransaction;
+  quote: QuoteExactOutResult;
   deadline: number;
 }
